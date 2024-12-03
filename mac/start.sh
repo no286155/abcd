@@ -20,11 +20,19 @@ echo runnerrdp | perl -we 'BEGIN { @k = unpack "C*", pack "H*", "1734516E8BA8C5E
 #Start VNC/reset changes
 sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent -console
 sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate
-#install ngrok
-brew install --cask ngrok
-#configure ngrok and start it
-ngrok authtoken $1
-ngrok tcp 5900 --region=in &
-sleep 5
-TUNNEL_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-echo "VNC Tunnel URL: $TUNNEL_URL"
+# Install localtunnel via npm
+
+npm install -g localtunnel
+
+
+# Expose local port
+
+lt --port 5900 &
+# #install ngrok
+# brew install --cask ngrok
+# #configure ngrok and start it
+# ngrok authtoken $1
+# ngrok tcp 5900 --region=in &
+# sleep 5
+# TUNNEL_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+# echo "VNC Tunnel URL: $TUNNEL_URL"
