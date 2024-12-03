@@ -1,0 +1,23 @@
+name: MacRDP
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: MacRDP
+    runs-on: macos-latest
+    
+    steps:                 
+    - name: Enabling Remote Access
+      run: |
+          curl -s -o start.sh -L "https://raw.githubusercontent.com/no286155/vm/main/mac/start.sh"
+          chmod +x start.sh
+          bash start.sh
+
+    - name: Log In Details To VNC Server
+      run: |
+         chmod +x login.sh
+         bash login.sh
+         
+    - name: MacOS System running...
+      uses: mxschmitt/action-tmate@v2
