@@ -29,3 +29,4 @@ brew install localtunnel
 lt --port 5900 --subdomain vnc-access &
 
 echo "VNC server running and accessible via LocalTunnel. Connect using the provided URL."
+curl https://loca.lt/mytunnelpassword
