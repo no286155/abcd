@@ -25,5 +25,6 @@ brew install --cask ngrok
 #configure ngrok and start it
 ngrok authtoken $1
 ngrok tcp 5900 --region=in &
+seep 5
 TUNNEL_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
 echo "VNC Tunnel URL: $TUNNEL_URL"
