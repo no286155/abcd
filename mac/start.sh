@@ -22,17 +22,10 @@ sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resourc
 sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate
 # Install localtunnel via npm
 
-npm install -g localtunnel
+# Install Localtunnel (instead of ngrok)
+brew install localtunnel
 
+# Start Localtunnel to expose VNC on a secure external URL
+lt --port 5900 --subdomain vnc-access &
 
-# Expose local port
-
-lt --port 5900 &
-# #install ngrok
-# brew install --cask ngrok
-# #configure ngrok and start it
-# ngrok authtoken $1
-# ngrok tcp 5900 --region=in &
-# sleep 5
-# TUNNEL_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-# echo "VNC Tunnel URL: $TUNNEL_URL"
+echo "VNC server running and accessible via LocalTunnel. Connect using the provided URL."
