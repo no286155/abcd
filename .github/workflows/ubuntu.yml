@@ -51,6 +51,28 @@ jobs:
             xdg-utils \
             wget \
             xvfb 
+          sudo apt-get install -y \
+            libgconf-2-4 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libgdk-pixbuf2.0-0 \
+            libgtk-3-0 \
+            libgbm-dev \
+            libnss3-dev \
+            libxss-dev \
+            fonts-liberation \
+            libappindicator3-1 \
+            libx11-xcb1 \
+            xdg-utils \
+            libxcomposite1 \
+            libxcursor1 \
+            libxdamage1 \
+            libxi6 \
+            libxtst6 \
+            libxrandr2 \
+            libasound2 \
+            libxss1 \
+            libxshmfence1
       - name: Checkout main repository
         uses: actions/checkout@v4
         with:
