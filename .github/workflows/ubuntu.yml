@@ -1,4 +1,4 @@
-name: Deploy Express Servers
+name: WF DEF
 
 on:
   workflow_dispatch:
@@ -83,13 +83,19 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
       - name: Clone private repositories
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-vtt.git repo1
           git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-api.git repo2
-          # git clone https://${GH_TOKEN}@github.com/your-org/repo3.git repo3
+          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-imgs.git repo3
+          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-php.git php
 
       - name: Install dependencies and start servers
         run: |
@@ -106,10 +112,13 @@ jobs:
           cd ..
 
           # Server 3
-          # cd repo3
-          # npm install
-          # PORT=3002 npm run dev &
-          # cd ..
+          cd repo3
+          npm install
+          npm run start &
+          cd ..
+
+          # Server php
+          php -S localhost:8000 -t php/ &
 
       - name: Get public IP
         id: ip
@@ -157,14 +166,23 @@ jobs:
                   proxy_cache_bypass $http_upgrade;
               }
 
-              # location /app3 {
-              #     proxy_pass http://localhost:3005;
-              #     proxy_http_version 1.1;
-              #     proxy_set_header Upgrade $http_upgrade;
-              #     proxy_set_header Connection 'upgrade';
-              #     proxy_set_header Host $host;
-              #     proxy_cache_bypass $http_upgrade;
-              # }
+              location /app3 {
+                  proxy_pass http://localhost:3005;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_cache_bypass $http_upgrade;
+              }
+
+              location /php {
+                proxy_pass http://localhost:8000;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_cache_bypass $http_upgrade;
+            }
           }
           EOF
 
@@ -190,5 +208,6 @@ jobs:
           echo "Services are accessible at: $NGROK_URL"
           echo "app1: $NGROK_URL/app1"
           echo "app2: $NGROK_URL/app2"
-          # echo "app3: $NGROK_URL/app3"
+          echo "app3: $NGROK_URL/app3"
+          echo "php: $NGROK_URL/php"
           sleep 1h
