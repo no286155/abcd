@@ -1,8 +1,6 @@
 name: Deploy Express Servers
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
