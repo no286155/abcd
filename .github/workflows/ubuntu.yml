@@ -89,6 +89,12 @@ jobs:
           # PORT=3002 npm run dev &
           # cd ..
 
+      - name: Get public IP
+        id: ip
+        run: |
+          PUBLIC_IP=$(curl -s https://api.ipify.org)
+          echo "PUBLIC_IP=${PUBLIC_IP}" >> $GITHUB_ENV
+
       - name: Create tunnel with ngrok
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
@@ -141,6 +147,21 @@ jobs:
           EOF
 
           sudo systemctl restart nginx
+
+      - name: Configure firewall
+        run: |
+          sudo ufw allow 80/tcp
+          sudo ufw allow 443/tcp
+          sudo ufw --force enable
+
+      - name: Display access information
+        run: |
+          echo "Server is accessible at: http://${{ env.PUBLIC_IP }}"
+          echo "Configure your domain to point to this IP: ${{ env.PUBLIC_IP }}"
+          echo "Access your services at:"
+          echo "- http://your-domain.com/app1"
+          echo "- http://your-domain.com/app2"
+          echo "- http://your-domain.com/app3"
 
       - name: Keep alive
         run: |
