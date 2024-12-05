@@ -31,13 +31,13 @@ jobs:
           # Server 1
           cd repo1
           npm install
-          node src/index.js &
+          node api/index.js &
           cd ..
 
           # Server 2
           cd repo2
           npm install
-          node src/index.js &
+          node api/index.js &
           cd ..
 
           # Server 3
