@@ -118,7 +118,7 @@ jobs:
           cd ..
 
           # Server php
-          php -S localhost:8000 -t php/ &
+          # php -S localhost:8000 -t php/ &
 
       - name: Get public IP
         id: ip
@@ -142,7 +142,17 @@ jobs:
       - name: Setup nginx reverse proxy
         run: |
           sudo apt-get update
-          sudo apt-get install -y nginx
+          sudo apt-get install -y nginx php8.1-fpm
+
+          # Configure PHP-FPM
+          sudo sed -i 's/user = www-data/user = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+          sudo sed -i 's/group = www-data/group = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+          sudo sed -i 's/listen.owner = www-data/listen.owner = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+          sudo sed -i 's/listen.group = www-data/listen.group = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+
+          # Start PHP-FPM
+          sudo systemctl start php8.1-fpm
+          
           sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
           server {
               listen 80;
@@ -175,14 +185,26 @@ jobs:
                   proxy_cache_bypass $http_upgrade;
               }
 
-              location ~ ^/php(/.*\.php)$ {
-                proxy_pass http://localhost:8000$1$is_args$args;
-                proxy_http_version 1.1;
-                proxy_set_header Upgrade $http_upgrade;
-                proxy_set_header Connection 'upgrade';
-                proxy_set_header Host $host;
-                proxy_cache_bypass $http_upgrade;
-            }
+            #   location ~ ^/php(/.*\.php)$ {
+            #     proxy_pass http://localhost:8000$1$is_args$args;
+            #     proxy_http_version 1.1;
+            #     proxy_set_header Upgrade $http_upgrade;
+            #     proxy_set_header Connection 'upgrade';
+            #     proxy_set_header Host $host;
+            #     proxy_cache_bypass $http_upgrade;
+            # }
+            # PHP files handling
+              location /php {
+                  root /home/runner/work/abcd/abcd;
+                  index index.php;
+                  
+                  location ~ \.php$ {
+                      include snippets/fastcgi-php.conf;
+                      fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+                      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                      include fastcgi_params;
+                  }
+              }
           }
           EOF
 
