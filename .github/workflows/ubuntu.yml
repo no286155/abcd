@@ -83,42 +83,10 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-
-      - name: Clone private repositories
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-vtt.git repo1
-          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-api.git repo2
-          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-imgs.git repo3
-          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-php.git php
-
-      - name: Install dependencies and start servers
-        run: |
-          # Server 1
-          cd repo1
-          npm install
-          node api/index.js &
-          cd ..
-
-          # Server 2
-          cd repo2
-          npm install
-          node api/index.js &
-          cd ..
-
-          # Server 3
-          cd repo3
-          npm install
-          npm run start &
-          cd ..
-
-          # Server php
-          # php -S localhost:8000 -t php/ &
+      # - name: Setup PHP
+      #   uses: shivammathur/setup-php@v2
+      #   with:
+      #     php-version: '8.1'
 
       - name: Get public IP
         id: ip
@@ -142,21 +110,36 @@ jobs:
       - name: Setup nginx reverse proxy
         run: |
           sudo apt-get update
-          sudo apt-get install -y nginx php8.1-fpm
+          sudo apt-get install -y nginx
+          sudo apt-get install -y php8.1-fpm php8.1-mysql php8.1-curl php8.1-gd php8.1-mbstring php8.1-xml php8.1-zip
 
-          # Configure PHP-FPM
-          sudo sed -i 's/user = www-data/user = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
-          sudo sed -i 's/group = www-data/group = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
-          sudo sed -i 's/listen.owner = www-data/listen.owner = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
-          sudo sed -i 's/listen.group = www-data/listen.group = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+          # # Configure PHP-FPM
+          # sudo sed -i 's/user = www-data/user = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+          # sudo sed -i 's/group = www-data/group = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+          # sudo sed -i 's/listen.owner = www-data/listen.owner = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
+          # sudo sed -i 's/listen.group = www-data/listen.group = runner/g' /etc/php/8.1/fpm/pool.d/www.conf
 
-          # Start PHP-FPM
-          sudo systemctl start php8.1-fpm
+          # # Start PHP-FPM
+          # sudo systemctl start php8.1-fpm
           
           sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
           server {
               listen 80;
               server_name _;
+              root /var/www/html;
+              index index.php index.html;
+
+              # PHP application under /php-app
+              location /php-app {
+                  alias /var/www/html/php-app;
+                  try_files $uri $uri/ /php-app/index.php?$args;
+
+                  location ~ \.php$ {
+                      include snippets/fastcgi-php.conf;
+                      fastcgi_param SCRIPT_FILENAME $request_filename;
+                      fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+                  }
+              }
 
               location /app1 {
                   proxy_pass http://localhost:3000;
@@ -194,21 +177,56 @@ jobs:
             #     proxy_cache_bypass $http_upgrade;
             # }
             # PHP files handling
-              location /php {
-                  root /home/runner/work/abcd/abcd/php;
-                  index index.php;
-                  
-                  location ~ \.php$ {
-                      include snippets/fastcgi-php.conf;
-                      fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
-                      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-                      include fastcgi_params;
-                  }
-              }
+              # location /php {
+              #     root /home/runner/work/abcd/abcd/php;
+              #     index index.php;
+              #     location ~ \.php$ {
+              #         include snippets/fastcgi-php.conf;
+              #         fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+              #         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+              #         include fastcgi_params;
+              #     }
+              # }
           }
           EOF
 
           sudo systemctl restart nginx
+          sudo systemctl restart php8.1-fpm
+
+      - name: Clone private repositories
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-vtt.git repo1
+          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-api.git repo2
+          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-imgs.git repo3
+          git clone https://${GH_TOKEN}@github.com/locionic/kaaforward-php.git php-app
+
+      - name: Install dependencies and start servers
+        run: |
+          # Server 1
+          cd repo1
+          npm install
+          node api/index.js &
+          cd ..
+
+          # Server 2
+          cd repo2
+          npm install
+          node api/index.js &
+          cd ..
+
+          # Server 3
+          cd repo3
+          npm install
+          npm run start &
+          cd ..
+
+          # Server php
+          # php -S localhost:8000 -t php/ &
+          # Move PHP app to web root
+          sudo mv php-app /var/www/html/
+          sudo chown -R www-data:www-data /var/www/html/php-app
 
       - name: Configure firewall
         run: |
@@ -225,11 +243,29 @@ jobs:
           echo "- http://your-domain.com/app2"
           # echo "- http://your-domain.com/app3"
 
-      - name: Keep alive
+      - name: Create PHP test file
         run: |
-          echo "Services are accessible at: $NGROK_URL"
-          echo "app1: $NGROK_URL/app1"
-          echo "app2: $NGROK_URL/app2"
-          # echo "app3: $NGROK_URL/app3"
-          # echo "php: $NGROK_URL/php"
+          sudo tee /var/www/html/php-app/index.php > /dev/null << 'EOF'
+          <?php
+          header('Content-Type: application/json');
+          echo json_encode([
+              'status' => 'success',
+              'message' => 'PHP is working!',
+              'php_version' => phpversion(),
+              'server_time' => date('Y-m-d H:i:s')
+          ]);
+          EOF
+
+      - name: Monitor logs
+        run: |
+          tail -f /var/log/nginx/access.log /var/log/nginx/error.log ngrok.log &
           sleep 1h
+
+      # - name: Keep alive
+      #   run: |
+      #     echo "Services are accessible at: $NGROK_URL"
+      #     echo "app1: $NGROK_URL/app1"
+      #     echo "app2: $NGROK_URL/app2"
+      #     # echo "app3: $NGROK_URL/app3"
+      #     # echo "php: $NGROK_URL/php"
+      #     sleep 1h
