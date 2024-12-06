@@ -195,7 +195,7 @@ jobs:
             # }
             # PHP files handling
               location /php {
-                  root /home/runner/work/abcd/abcd;
+                  root /home/runner/work/abcd/abcd/php;
                   index index.php;
                   
                   location ~ \.php$ {
