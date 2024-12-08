@@ -259,7 +259,7 @@ jobs:
       - name: Monitor logs
         run: |
           tail -f /var/log/nginx/access.log /var/log/nginx/error.log ngrok.log &
-          sleep 1h
+          sleep 2h
 
       # - name: Keep alive
       #   run: |
