@@ -120,7 +120,7 @@ jobs:
           tunnel: ${CLOUDFLARE_TOKEN}
           credentials-file: /root/.cloudflared/credentials.json
           ingress:
-            - hostname: your-domain.com
+            - hostname: tunnel.hloc.us.kg
               service: http://localhost:80
               originRequest:
                 connectTimeout: 10s
@@ -146,7 +146,7 @@ jobs:
           # Optional: Monitor metrics for 30 seconds
           (curl -s http://localhost:2000/metrics > tunnel_metrics.txt) &
 
-      - name: Setup nginx reverse proxy
+      - name: Install nginx php
         run: |
           sudo apt-get update
           sudo apt-get install -y nginx
@@ -161,7 +161,8 @@ jobs:
           # # Start PHP-FPM
           # sudo systemctl start php8.1-fpm
 
-          # Optimize Nginx Configuration
+      - name: Optimize Nginx Configuration
+        run: |
           sudo tee /etc/nginx/conf.d/performance.conf << EOF
           fastcgi_buffers 16 16k;
           fastcgi_buffer_size 32k;
@@ -181,7 +182,8 @@ jobs:
           keepalive_requests 100;
           EOF
 
-          # Optimize PHP-FPM
+      - name: Optimize PHP-FPM
+        run: |
           sudo tee /etc/php/8.1/fpm/pool.d/www.conf << EOF
           [www]
           user = www-data
@@ -196,7 +198,11 @@ jobs:
           pm.max_spare_servers = 35
           pm.max_requests = 500
           EOF
-          
+        
+          sudo service php8.1-fpm restart
+
+      - name: Setup nginx reverse proxy
+        run: |
           sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
           server {
               listen 80;
