@@ -170,6 +170,67 @@ jobs:
           # # Start PHP-FPM
           # sudo systemctl start php8.1-fpm
 
+      - name: Optimize Nginx Configuration
+        run: |
+          # sudo tee /etc/nginx/conf.d/performance.conf << EOF
+          # fastcgi_buffers 16 16k;
+          # fastcgi_buffer_size 32k;
+          # fastcgi_connect_timeout 300;
+          # fastcgi_send_timeout 300;
+          # fastcgi_read_timeout 300;
+          # # Compression
+          # gzip on;
+          # gzip_vary on;
+          # gzip_min_length 10240;
+          # gzip_proxied expired no-cache no-store private auth;
+          # gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml;
+          # # Connection optimization
+          # keepalive_timeout 65;
+          # keepalive_requests 100;
+          # EOF
+          sudo tee /etc/nginx/conf.d/performance.conf << EOF
+          # FastCGI Buffers and Timeouts
+          fastcgi_buffers 16 16k;
+          fastcgi_buffer_size 32k;
+          fastcgi_connect_timeout 60s;
+          fastcgi_send_timeout 120s;
+          fastcgi_read_timeout 120s;
+          
+          # Compression
+          # gzip on;
+          # gzip_vary on;
+          # gzip_min_length 10240;
+          # gzip_proxied any;
+          # gzip_types text/plain text/css text/xml text/javascript application/javascript application/json;
+          
+          # Connection Optimization
+          keepalive_timeout 30s;
+          keepalive_requests 100;
+          
+          # Optional: Enable HTTP/2 (if supported)
+          # http2_push_preload on;
+          EOF
+          sudo nginx -t
+      - name: Optimize PHP-FPM
+        run: |
+          sudo tee /etc/php/8.1/fpm/pool.d/www.conf << EOF
+          [www]
+          user = www-data
+          group = www-data
+          listen = /run/php/php8.1-fpm.sock
+          listen.owner = www-data
+          listen.group = www-data
+          pm = dynamic
+          pm.max_children = 50
+          pm.start_servers = 5
+          pm.min_spare_servers = 5
+          pm.max_spare_servers = 35
+          pm.max_requests = 500
+          EOF
+          # sudo service php8.1-fpm restart
+
+      - name: Setup nginx reverse proxy
+        run: |
           sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
           server {
               listen 80;
@@ -238,135 +299,6 @@ jobs:
           }
           EOF
 
-      - name: Optimize Nginx Configuration
-        run: |
-          # sudo tee /etc/nginx/conf.d/performance.conf << EOF
-          # fastcgi_buffers 16 16k;
-          # fastcgi_buffer_size 32k;
-          # fastcgi_connect_timeout 300;
-          # fastcgi_send_timeout 300;
-          # fastcgi_read_timeout 300;
-          # # Compression
-          # gzip on;
-          # gzip_vary on;
-          # gzip_min_length 10240;
-          # gzip_proxied expired no-cache no-store private auth;
-          # gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml;
-          # # Connection optimization
-          # keepalive_timeout 65;
-          # keepalive_requests 100;
-          # EOF
-          sudo tee /etc/nginx/conf.d/performance.conf << EOF
-          # FastCGI Buffers and Timeouts
-          fastcgi_buffers 16 16k;
-          fastcgi_buffer_size 32k;
-          fastcgi_connect_timeout 60s;
-          fastcgi_send_timeout 120s;
-          fastcgi_read_timeout 120s;
-          
-          # Compression
-          # gzip on;
-          # gzip_vary on;
-          # gzip_min_length 10240;
-          # gzip_proxied any;
-          # gzip_types text/plain text/css text/xml text/javascript application/javascript application/json;
-          
-          # Connection Optimization
-          keepalive_timeout 30s;
-          keepalive_requests 100;
-          
-          # Optional: Enable HTTP/2 (if supported)
-          # http2_push_preload on;
-          EOF
-          sudo nginx -t
-      - name: Optimize PHP-FPM
-        run: |
-          sudo tee /etc/php/8.1/fpm/pool.d/www.conf << EOF
-          [www]
-          user = www-data
-          group = www-data
-          listen = /run/php/php8.1-fpm.sock
-          listen.owner = www-data
-          listen.group = www-data
-          pm = dynamic
-          pm.max_children = 50
-          pm.start_servers = 5
-          pm.min_spare_servers = 5
-          pm.max_spare_servers = 35
-          pm.max_requests = 500
-          EOF
-          # sudo service php8.1-fpm restart
-
-      - name: Setup nginx reverse proxy
-        run: |
-          # sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
-          # server {
-          #     listen 80;
-          #     server_name _;
-          #     root /var/www/html;
-          #     index index.php index.html;
-
-          #     # PHP application under /php-app
-          #     location /php-app {
-          #         alias /var/www/html/php-app;
-          #         try_files $uri $uri/ /php-app/index.php?$args;
-
-          #         location ~ \.php$ {
-          #             include snippets/fastcgi-php.conf;
-          #             fastcgi_param SCRIPT_FILENAME $request_filename;
-          #             fastcgi_pass unix:/run/php/php8.1-fpm.sock;
-          #         }
-          #     }
-
-          #     location /app1 {
-          #         proxy_pass http://localhost:3001;
-          #         proxy_http_version 1.1;
-          #         proxy_set_header Upgrade $http_upgrade;
-          #         proxy_set_header Connection 'upgrade';
-          #         proxy_set_header Host $host;
-          #         proxy_cache_bypass $http_upgrade;
-          #     }
-
-          #     location /app2 {
-          #         proxy_pass http://localhost:3003;
-          #         proxy_http_version 1.1;
-          #         proxy_set_header Upgrade $http_upgrade;
-          #         proxy_set_header Connection 'upgrade';
-          #         proxy_set_header Host $host;
-          #         proxy_cache_bypass $http_upgrade;
-          #     }
-
-          #     location /app3 {
-          #         proxy_pass http://localhost:3005;
-          #         proxy_http_version 1.1;
-          #         proxy_set_header Upgrade $http_upgrade;
-          #         proxy_set_header Connection 'upgrade';
-          #         proxy_set_header Host $host;
-          #         proxy_cache_bypass $http_upgrade;
-          #     }
-
-          #   #   location ~ ^/php(/.*\.php)$ {
-          #   #     proxy_pass http://localhost:8000$1$is_args$args;
-          #   #     proxy_http_version 1.1;
-          #   #     proxy_set_header Upgrade $http_upgrade;
-          #   #     proxy_set_header Connection 'upgrade';
-          #   #     proxy_set_header Host $host;
-          #   #     proxy_cache_bypass $http_upgrade;
-          #   # }
-          #   # PHP files handling
-          #     # location /php {
-          #     #     root /home/runner/work/abcd/abcd/php;
-          #     #     index index.php;
-          #     #     location ~ \.php$ {
-          #     #         include snippets/fastcgi-php.conf;
-          #     #         fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
-          #     #         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-          #     #         include fastcgi_params;
-          #     #     }
-          #     # }
-          # }
-          # EOF
-
           sudo systemctl restart nginx
           sudo systemctl restart php8.1-fpm
 
@@ -433,33 +365,33 @@ jobs:
           ]);
           EOF
 
-      # - name: Monitor logs
-      #   # timeout-minutes: 120
-      #   run: |
-      #     tail -f /var/log/nginx/access.log /var/log/nginx/error.log ngrok.log &
-      #     sleep 2h
-
-      - name: Verify Connection and Performance
+      - name: Monitor logs
+        # timeout-minutes: 120
         run: |
-          # Wait for service to be fully established
-          sleep 15
-          
-          # Basic connection test
-          curl -I https://your-domain.com
-          
-          # Check Nginx status
-          sudo nginx -t
-          
-          # Display relevant logs
-          echo "=== Nginx Error Logs ==="
-          sudo tail -n 50 /var/log/nginx/error.log || true
-          
-          echo "=== PHP-FPM Logs ==="
-          sudo tail -n 50 /var/log/php8.1-fpm.log || true
-          
-          echo "=== Tunnel Metrics ==="
-          cat tunnel_metrics.txt || true
+          tail -f /var/log/nginx/access.log /var/log/nginx/error.log ngrok.log &
           sleep 2h
+
+      # - name: Verify Connection and Performance
+      #   run: |
+      #     # Wait for service to be fully established
+      #     sleep 15
+          
+      #     # Basic connection test
+      #     curl -I https://your-domain.com
+          
+      #     # Check Nginx status
+      #     sudo nginx -t
+          
+      #     # Display relevant logs
+      #     echo "=== Nginx Error Logs ==="
+      #     sudo tail -n 50 /var/log/nginx/error.log || true
+          
+      #     echo "=== PHP-FPM Logs ==="
+      #     sudo tail -n 50 /var/log/php8.1-fpm.log || true
+          
+      #     echo "=== Tunnel Metrics ==="
+      #     cat tunnel_metrics.txt || true
+      #     sleep 2h
 
       # - name: Keep alive
       #   run: |
