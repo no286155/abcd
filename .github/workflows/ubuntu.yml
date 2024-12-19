@@ -240,7 +240,7 @@ jobs:
 
       - name: Optimize Nginx Configuration
         run: |
-          sudo tee /etc/nginx/conf.d/performance.conf << EOF
+          sudo tee /etc/nginx/conf.d/performance.conf > /dev/null << EOF
           fastcgi_buffers 16 16k;
           fastcgi_buffer_size 32k;
           fastcgi_connect_timeout 300;
@@ -259,23 +259,23 @@ jobs:
           keepalive_requests 100;
           EOF
 
-      # - name: Optimize PHP-FPM
-      #   run: |
-      #     sudo tee /etc/php/8.1/fpm/pool.d/www.conf << EOF
-      #     [www]
-      #     user = www-data
-      #     group = www-data
-      #     listen = /run/php/php8.1-fpm.sock
-      #     listen.owner = www-data
-      #     listen.group = www-data
-      #     pm = dynamic
-      #     pm.max_children = 50
-      #     pm.start_servers = 5
-      #     pm.min_spare_servers = 5
-      #     pm.max_spare_servers = 35
-      #     pm.max_requests = 500
-      #     EOF
-      #     # sudo service php8.1-fpm restart
+      - name: Optimize PHP-FPM
+        run: |
+          sudo tee /etc/php/8.1/fpm/pool.d/www.conf > /dev/null << EOF
+          [www]
+          user = www-data
+          group = www-data
+          listen = /run/php/php8.1-fpm.sock
+          listen.owner = www-data
+          listen.group = www-data
+          pm = dynamic
+          pm.max_children = 50
+          pm.start_servers = 5
+          pm.min_spare_servers = 5
+          pm.max_spare_servers = 35
+          pm.max_requests = 500
+          EOF
+          # sudo service php8.1-fpm restart
 
       - name: Setup nginx reverse proxy
         run: |
