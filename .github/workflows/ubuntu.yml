@@ -257,9 +257,11 @@ jobs:
           EOF
 
       - name: Monitor logs
+        timeout-minutes: 120
         run: |
           tail -f /var/log/nginx/access.log /var/log/nginx/error.log ngrok.log &
           sleep 2h
+          
 
       # - name: Keep alive
       #   run: |
