@@ -146,14 +146,14 @@ jobs:
           # # Optional: Monitor metrics for 30 seconds
           # (curl -s http://localhost:2000/metrics > tunnel_metrics.txt) &
           
-          # List tunnels to get the ID/name
-          TUNNEL_ID=$(sudo cloudflared tunnel list | grep -v 'NAME' | awk '{print $1}')
+          # # List tunnels to get the ID/name
+          # TUNNEL_ID=$(sudo cloudflared tunnel list | grep -v 'NAME' | awk '{print $1}')
           
-          # Now we can check the specific tunnel info
-          sudo cloudflared tunnel info $TUNNEL_ID
+          # # Now we can check the specific tunnel info
+          # sudo cloudflared tunnel info $TUNNEL_ID
           
-          # Optional: Run tunnel with specific port if needed
-          sudo cloudflared tunnel run --url http://localhost:80 $TUNNEL_ID
+          # # Optional: Run tunnel with specific port if needed
+          # sudo cloudflared tunnel run --url http://localhost:80 $TUNNEL_ID
 
       - name: Install nginx php
         run: |
