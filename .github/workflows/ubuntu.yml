@@ -136,15 +136,24 @@ jobs:
           sleep 10
           # You might want to verify the connection
           # sudo cloudflared tunnel info
-          # Get tunnel ID and verify
+          # # Get tunnel ID and verify
+          # TUNNEL_ID=$(sudo cloudflared tunnel list | grep -v 'NAME' | awk '{print $1}')
+          # echo "Tunnel ID: $TUNNEL_ID"
+          
+          # # Monitor initial connection
+          # timeout 30s sudo cloudflared tunnel info $TUNNEL_ID || true
+          
+          # # Optional: Monitor metrics for 30 seconds
+          # (curl -s http://localhost:2000/metrics > tunnel_metrics.txt) &
+          
+          # List tunnels to get the ID/name
           TUNNEL_ID=$(sudo cloudflared tunnel list | grep -v 'NAME' | awk '{print $1}')
-          echo "Tunnel ID: $TUNNEL_ID"
           
-          # Monitor initial connection
-          timeout 30s sudo cloudflared tunnel info $TUNNEL_ID || true
+          # Now we can check the specific tunnel info
+          sudo cloudflared tunnel info $TUNNEL_ID
           
-          # Optional: Monitor metrics for 30 seconds
-          (curl -s http://localhost:2000/metrics > tunnel_metrics.txt) &
+          # Optional: Run tunnel with specific port if needed
+          sudo cloudflared tunnel run --url http://localhost:80 $TUNNEL_ID
 
       - name: Install nginx php
         run: |
@@ -161,48 +170,6 @@ jobs:
           # # Start PHP-FPM
           # sudo systemctl start php8.1-fpm
 
-      - name: Optimize Nginx Configuration
-        run: |
-          sudo tee /etc/nginx/conf.d/performance.conf << EOF
-          fastcgi_buffers 16 16k;
-          fastcgi_buffer_size 32k;
-          fastcgi_connect_timeout 300;
-          fastcgi_send_timeout 300;
-          fastcgi_read_timeout 300;
-          
-          # Compression
-          gzip on;
-          gzip_vary on;
-          gzip_min_length 10240;
-          gzip_proxied expired no-cache no-store private auth;
-          gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml;
-          
-          # Connection optimization
-          keepalive_timeout 65;
-          keepalive_requests 100;
-          EOF
-
-      - name: Optimize PHP-FPM
-        run: |
-          sudo tee /etc/php/8.1/fpm/pool.d/www.conf << EOF
-          [www]
-          user = www-data
-          group = www-data
-          listen = /run/php/php8.1-fpm.sock
-          listen.owner = www-data
-          listen.group = www-data
-          pm = dynamic
-          pm.max_children = 50
-          pm.start_servers = 5
-          pm.min_spare_servers = 5
-          pm.max_spare_servers = 35
-          pm.max_requests = 500
-          EOF
-        
-          sudo service php8.1-fpm restart
-
-      - name: Setup nginx reverse proxy
-        run: |
           sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
           server {
               listen 80;
@@ -270,6 +237,115 @@ jobs:
               # }
           }
           EOF
+
+      - name: Optimize Nginx Configuration
+        run: |
+          sudo tee /etc/nginx/conf.d/performance.conf << EOF
+          fastcgi_buffers 16 16k;
+          fastcgi_buffer_size 32k;
+          fastcgi_connect_timeout 300;
+          fastcgi_send_timeout 300;
+          fastcgi_read_timeout 300;
+          
+          # Compression
+          gzip on;
+          gzip_vary on;
+          gzip_min_length 10240;
+          gzip_proxied expired no-cache no-store private auth;
+          gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml;
+          
+          # Connection optimization
+          keepalive_timeout 65;
+          keepalive_requests 100;
+          EOF
+
+      - name: Optimize PHP-FPM
+        run: |
+          sudo tee /etc/php/8.1/fpm/pool.d/www.conf << EOF
+          [www]
+          user = www-data
+          group = www-data
+          listen = /run/php/php8.1-fpm.sock
+          listen.owner = www-data
+          listen.group = www-data
+          pm = dynamic
+          pm.max_children = 50
+          pm.start_servers = 5
+          pm.min_spare_servers = 5
+          pm.max_spare_servers = 35
+          pm.max_requests = 500
+          EOF
+          # sudo service php8.1-fpm restart
+
+      - name: Setup nginx reverse proxy
+        run: |
+          # sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
+          # server {
+          #     listen 80;
+          #     server_name _;
+          #     root /var/www/html;
+          #     index index.php index.html;
+
+          #     # PHP application under /php-app
+          #     location /php-app {
+          #         alias /var/www/html/php-app;
+          #         try_files $uri $uri/ /php-app/index.php?$args;
+
+          #         location ~ \.php$ {
+          #             include snippets/fastcgi-php.conf;
+          #             fastcgi_param SCRIPT_FILENAME $request_filename;
+          #             fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+          #         }
+          #     }
+
+          #     location /app1 {
+          #         proxy_pass http://localhost:3001;
+          #         proxy_http_version 1.1;
+          #         proxy_set_header Upgrade $http_upgrade;
+          #         proxy_set_header Connection 'upgrade';
+          #         proxy_set_header Host $host;
+          #         proxy_cache_bypass $http_upgrade;
+          #     }
+
+          #     location /app2 {
+          #         proxy_pass http://localhost:3003;
+          #         proxy_http_version 1.1;
+          #         proxy_set_header Upgrade $http_upgrade;
+          #         proxy_set_header Connection 'upgrade';
+          #         proxy_set_header Host $host;
+          #         proxy_cache_bypass $http_upgrade;
+          #     }
+
+          #     location /app3 {
+          #         proxy_pass http://localhost:3005;
+          #         proxy_http_version 1.1;
+          #         proxy_set_header Upgrade $http_upgrade;
+          #         proxy_set_header Connection 'upgrade';
+          #         proxy_set_header Host $host;
+          #         proxy_cache_bypass $http_upgrade;
+          #     }
+
+          #   #   location ~ ^/php(/.*\.php)$ {
+          #   #     proxy_pass http://localhost:8000$1$is_args$args;
+          #   #     proxy_http_version 1.1;
+          #   #     proxy_set_header Upgrade $http_upgrade;
+          #   #     proxy_set_header Connection 'upgrade';
+          #   #     proxy_set_header Host $host;
+          #   #     proxy_cache_bypass $http_upgrade;
+          #   # }
+          #   # PHP files handling
+          #     # location /php {
+          #     #     root /home/runner/work/abcd/abcd/php;
+          #     #     index index.php;
+          #     #     location ~ \.php$ {
+          #     #         include snippets/fastcgi-php.conf;
+          #     #         fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+          #     #         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          #     #         include fastcgi_params;
+          #     #     }
+          #     # }
+          # }
+          # EOF
 
           sudo systemctl restart nginx
           sudo systemctl restart php8.1-fpm
