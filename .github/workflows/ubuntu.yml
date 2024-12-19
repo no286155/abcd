@@ -116,7 +116,7 @@ jobs:
           sudo cloudflared service install $CLOUDFLARE_TOKEN
           sleep 10
           # You might want to verify the connection
-          sudo cloudflared tunnel info
+          # sudo cloudflared tunnel info
 
       - name: Setup nginx reverse proxy
         run: |
