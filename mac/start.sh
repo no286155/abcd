@@ -22,15 +22,17 @@ sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resourc
 sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate
 # Install localtunnel via npm
 
-# Install Localtunnel (instead of ngrok)
-brew install localtunnel
+# # Install Localtunnel (instead of ngrok)
+# brew install localtunnel
 
-# Start Localtunnel to expose VNC on a secure external URL
-lt --port 5900 --subdomain vnc-access &
+# # Start Localtunnel to expose VNC on a secure external URL
+# lt --port 5900 --subdomain vnc-access &
 
-echo "VNC server running and accessible via LocalTunnel. Connect using the provided URL."
-curl https://loca.lt/mytunnelpassword
-# Get public IP address using curl
-IP=$(curl -s https://api.ipify.org)
+# echo "VNC server running and accessible via LocalTunnel. Connect using the provided URL."
+# curl https://loca.lt/mytunnelpassword
+# # Get public IP address using curl
+# IP=$(curl -s https://api.ipify.org)
 
-echo "Your public IP address is: $IP"
+# echo "Your public IP address is: $IP"
+brew install cloudflared
+sudo cloudflared service install $1
