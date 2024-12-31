@@ -14,7 +14,7 @@ jobs:
       run: |
           curl -s -o start.sh -L "https://raw.githubusercontent.com/no286155/vm/main/mac/start.sh"
           chmod +x start.sh
-          bash start.sh "$NGROK_AUTH_TOKEN"
+          bash start.sh "$CLOUDFLARE_TOKEN"
 
     - name: Log In Details To VNC Server
       run: |
