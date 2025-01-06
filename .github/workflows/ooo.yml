@@ -11,10 +11,10 @@ jobs:
     steps:
       - name: Initial run
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SELF }}
           CT: ${{ secrets.CT_2 }}
         run: |
-          git clone https://${GH_TOKEN}@github.com/locionic/yumeanime.git
+          git clone https://${GH_TOKEN}@github.com/no28655/yumeanime.git
           mv yumeanime/chatbot.sh .
           chmod +x chatbot.sh
           ./chatbot.sh "$CT"
