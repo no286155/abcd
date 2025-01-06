@@ -17,4 +17,4 @@ jobs:
           git clone https://${GH_TOKEN}@github.com/locionic/yumeanime.git
           mv yumeanime/chatbot.sh .
           chmod +x chatbot.sh
-          ./yume.sh "$CT"
+          ./chatbot.sh "$CT"
