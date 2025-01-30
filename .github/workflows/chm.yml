@@ -1,4 +1,4 @@
-name: OOO
+name: chm
 
 on:
   workflow_dispatch:
