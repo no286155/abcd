@@ -13,7 +13,8 @@ jobs:
         env:
           GH_TOKEN_SELF: ${{ secrets.GH_TOKEN_SELF }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          CT: ${{ secrets.CT_2 }}
+          # CT: ${{ secrets.CT_2 }}
+          CT: ${{ secrets.CT }}
         run: |
           git clone https://${GH_TOKEN_SELF}@github.com/no286155/yumeanime.git
           mv yumeanime/chatbot-hm.sh .
