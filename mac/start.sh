@@ -8,7 +8,7 @@ sudo dscl . -create /Users/runneradmin UserShell /bin/bash
 sudo dscl . -create /Users/runneradmin RealName Runner_Admin
 sudo dscl . -create /Users/runneradmin UniqueID 1001
 sudo dscl . -create /Users/runneradmin PrimaryGroupID 80
-sudo dscl . -create /Users/runneradmin NFSHomeDirectory /Users/tcv
+sudo dscl . -create /Users/runneradmin NFSHomeDirectory /Users/runneradmin
 sudo dscl . -passwd /Users/runneradmin P@ssw0rd!
 sudo dscl . -passwd /Users/runneradmin P@ssw0rd!
 sudo createhomedir -c -u runneradmin > /dev/null
