@@ -11,10 +11,11 @@ jobs:
     - name: Enabling Remote Access
       env:
           CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
       run: |
           curl -s -o start.sh -L "https://raw.githubusercontent.com/no286155/vm/main/mac/start.sh"
           chmod +x start.sh
-          bash start.sh "$CLOUDFLARE_TOKEN"
+          bash start.sh "$CLOUDFLARE_TOKEN" "$NGROK_AUTH_TOKEN"
 
     - name: Log In Details To VNC Server
       run: |
