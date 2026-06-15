@@ -36,3 +36,10 @@ sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resourc
 # echo "Your public IP address is: $IP"
 brew install cloudflared
 sudo cloudflared service install $1
+
+#install ngrok
+brew cask install ngrok
+
+#configure ngrok and start it
+ngrok authtoken $2
+ngrok tcp 5900 &
