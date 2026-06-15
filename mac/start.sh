@@ -38,7 +38,7 @@ brew install cloudflared
 sudo cloudflared service install $1
 
 #install ngrok
-brew cask install ngrok
+brew install ngrok
 
 #configure ngrok and start it
 ngrok authtoken $2
