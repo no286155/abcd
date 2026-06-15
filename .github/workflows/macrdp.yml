@@ -5,7 +5,7 @@ on:
 jobs:
   build:
     name: MacRDP
-    runs-on: macos-13
+    runs-on: macos-latest
     
     steps:                 
     - name: Enabling Remote Access
