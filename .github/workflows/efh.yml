@@ -1,0 +1,485 @@
+name: Build-Full-Project
+
+on:
+  workflow_dispatch: # 确保 GitHub 页面显示蓝色的 "Run workflow" 按钮
+
+jobs:
+  build-and-run:
+    runs-on: macos-latest
+    timeout-minutes: 360
+    steps:
+      # 1. 环境准备
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          repository: Jiaye-apple/wftest
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 2. 安装工具
+      - name: Install Tools
+        run: |
+          brew install cliclick cloudflared
+          pip3 install flask pillow pyobjc-framework-Quartz --break-system-packages
+          echo "✅ 工具安装完成"
+
+      # 3. 防止休眠
+      - name: Prevent Sleep
+        run: |
+          caffeinate -d -i -u &
+          echo $! > /tmp/caffeinate.pid
+          defaults write com.apple.screensaver idleTime 0
+          killall SystemUIServer 2>/dev/null || true
+          echo "✅ 防休眠设置完成"
+
+      # 4. 启动远程控制服务器（使用Quartz截图，不用screencapture）
+      - name: Start Remote Control Server
+        run: |
+          cat << 'PYEOF' > remote_server.py
+          # -*- coding: utf-8 -*-
+          """
+          macOS远程控制服务器 - 使用Quartz直接读取屏幕
+          绕过screencapture的安全限制
+          """
+          from flask import Flask, send_file, request, jsonify, Response
+          import subprocess
+          import os
+          import io
+          import time
+
+          # 尝试导入Quartz进行原生截图
+          try:
+              import Quartz
+              from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionOnScreenOnly, kCGNullWindowID
+              from Quartz import CGMainDisplayID, CGDisplayBounds, CGWindowListCreateImage, kCGWindowImageDefault
+              from Quartz import CGRectInfinite, kCGWindowListOptionAll
+              import Quartz.CoreGraphics as CG
+              from PIL import Image
+              QUARTZ_AVAILABLE = True
+              print("✅ Quartz库加载成功")
+          except ImportError as e:
+              QUARTZ_AVAILABLE = False
+              print(f"⚠️ Quartz库不可用: {e}")
+
+          app = Flask(__name__)
+
+          # 屏幕分辨率
+          SCREEN_W, SCREEN_H = 1680, 1050
+
+          def get_screen_size():
+              """获取屏幕尺寸"""
+              global SCREEN_W, SCREEN_H
+              try:
+                  if QUARTZ_AVAILABLE:
+                      main_display = CGMainDisplayID()
+                      bounds = CGDisplayBounds(main_display)
+                      SCREEN_W = int(bounds.size.width)
+                      SCREEN_H = int(bounds.size.height)
+              except:
+                  pass
+              return SCREEN_W, SCREEN_H
+
+          def capture_screen_quartz():
+              """使用Quartz直接捕获屏幕"""
+              try:
+                  # 方法1: 使用CGWindowListCreateImage捕获整个屏幕
+                  image = CG.CGWindowListCreateImage(
+                      CG.CGRectInfinite,
+                      CG.kCGWindowListOptionOnScreenOnly,
+                      CG.kCGNullWindowID,
+                      CG.kCGWindowImageDefault
+                  )
+                  
+                  if image is None:
+                      print("CGWindowListCreateImage返回None")
+                      return None
+                  
+                  width = CG.CGImageGetWidth(image)
+                  height = CG.CGImageGetHeight(image)
+                  bytes_per_row = CG.CGImageGetBytesPerRow(image)
+                  
+                  # 获取像素数据
+                  provider = CG.CGImageGetDataProvider(image)
+                  data = CG.CGDataProviderCopyData(provider)
+                  
+                  # 转换为PIL Image
+                  img = Image.frombytes("RGBA", (width, height), data, "raw", "BGRA", bytes_per_row, 1)
+                  
+                  # 转换为PNG字节流
+                  output = io.BytesIO()
+                  img.save(output, format='PNG')
+                  output.seek(0)
+                  return output
+              except Exception as e:
+                  print(f"Quartz截图失败: {e}")
+                  return None
+
+          def capture_screen_fallback():
+              """备用方案：使用screencapture"""
+              img_path = '/tmp/screen.png'
+              try:
+                  # 尝试不同的screencapture参数
+                  result = subprocess.run(
+                      ['screencapture', '-C', '-x', '-t', 'png', img_path],
+                      timeout=10, capture_output=True
+                  )
+                  if os.path.exists(img_path) and os.path.getsize(img_path) > 1000:
+                      return img_path
+              except:
+                  pass
+              return None
+
+          # 特殊按键映射
+          KEY_CODES = {
+              'enter': 36, 'return': 36, 'tab': 48, 'space': 49,
+              'delete': 51, 'backspace': 51, 'escape': 53, 'esc': 53,
+              'up': 126, 'down': 125, 'left': 123, 'right': 124,
+              'home': 115, 'end': 119, 'pageup': 116, 'pagedown': 121,
+              'f1': 122, 'f2': 120, 'f3': 99, 'f4': 118, 'f5': 96,
+              'f6': 97, 'f7': 98, 'f8': 100, 'f9': 101, 'f10': 109,
+              'f11': 103, 'f12': 111
+          }
+
+          @app.route('/')
+          def index():
+              w, h = get_screen_size()
+              return f'''<!DOCTYPE html>
+          <html lang="zh-CN">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>macOS 远程控制</title>
+              <style>
+                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                  body {{ 
+                      background: #1a1a2e; color: #fff; 
+                      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                      min-height: 100vh;
+                  }}
+                  .toolbar {{
+                      background: rgba(30,30,50,0.95);
+                      padding: 10px 15px;
+                      position: fixed; top: 0; left: 0; right: 0;
+                      z-index: 1000;
+                      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+                      border-bottom: 1px solid rgba(100,100,255,0.3);
+                  }}
+                  .group {{
+                      display: flex; gap: 5px; align-items: center;
+                      padding: 4px 8px;
+                      background: rgba(255,255,255,0.05);
+                      border-radius: 6px;
+                  }}
+                  .group label {{ font-size: 11px; color: #888; margin-right: 4px; }}
+                  .btn {{
+                      background: linear-gradient(135deg, #667eea, #764ba2);
+                      color: #fff; border: none; padding: 6px 12px;
+                      border-radius: 5px; cursor: pointer; font-size: 12px;
+                  }}
+                  .btn:hover {{ opacity: 0.9; }}
+                  .btn-green {{ background: linear-gradient(135deg, #11998e, #38ef7d); }}
+                  .btn-red {{ background: linear-gradient(135deg, #eb3349, #f45c43); }}
+                  .btn-gray {{ background: linear-gradient(135deg, #4b6cb7, #182848); }}
+                  input, select {{
+                      background: #333; color: #fff; border: 1px solid #555;
+                      padding: 5px 8px; border-radius: 4px; font-size: 12px;
+                  }}
+                  .screen-area {{
+                      margin-top: 65px; padding: 10px;
+                      display: flex; justify-content: center;
+                  }}
+                  #screen {{
+                      max-width: 100%; max-height: calc(100vh - 120px);
+                      border: 2px solid rgba(100,100,255,0.4);
+                      border-radius: 8px; cursor: crosshair;
+                      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                  }}
+                  .status {{
+                      position: fixed; bottom: 0; left: 0; right: 0;
+                      background: rgba(20,20,40,0.95);
+                      padding: 6px 15px;
+                      display: flex; justify-content: space-between;
+                      font-size: 11px; color: #888;
+                  }}
+                  .toast {{
+                      position: fixed; bottom: 50px; left: 50%;
+                      transform: translateX(-50%);
+                      background: rgba(102,126,234,0.9);
+                      padding: 8px 16px; border-radius: 15px;
+                      font-size: 12px; opacity: 0; transition: opacity 0.3s;
+                  }}
+                  .toast.show {{ opacity: 1; }}
+              </style>
+          </head>
+          <body>
+              <div class="toolbar">
+                  <div class="group">
+                      <label>📝</label>
+                      <input type="text" id="textInput" placeholder="输入文字..." style="width:150px" onkeydown="if(event.key==='Enter')sendText()">
+                      <button class="btn" onclick="sendText()">发送</button>
+                  </div>
+                  <div class="group">
+                      <label>⌨️</label>
+                      <button class="btn btn-green" onclick="sendKey('enter')">Enter</button>
+                      <button class="btn btn-gray" onclick="sendKey('tab')">Tab</button>
+                      <button class="btn btn-gray" onclick="sendKey('escape')">Esc</button>
+                      <button class="btn btn-red" onclick="sendKey('backspace')">⌫</button>
+                  </div>
+                  <div class="group">
+                      <label>🎮</label>
+                      <button class="btn btn-gray" onclick="sendKey('up')">↑</button>
+                      <button class="btn btn-gray" onclick="sendKey('down')">↓</button>
+                      <button class="btn btn-gray" onclick="sendKey('left')">←</button>
+                      <button class="btn btn-gray" onclick="sendKey('right')">→</button>
+                  </div>
+                  <div class="group">
+                      <label>⚡</label>
+                      <button class="btn" onclick="sendShortcut('c')">⌘C</button>
+                      <button class="btn" onclick="sendShortcut('v')">⌘V</button>
+                      <button class="btn" onclick="sendShortcut('a')">⌘A</button>
+                      <button class="btn" onclick="sendShortcut('z')">⌘Z</button>
+                      <button class="btn" onclick="sendShortcut('s')">⌘S</button>
+                  </div>
+                  <div class="group">
+                      <label>🖱️</label>
+                      <select id="clickMode">
+                          <option value="c">单击</option>
+                          <option value="dc">双击</option>
+                          <option value="rc">右键</option>
+                      </select>
+                  </div>
+                  <div class="group">
+                      <select id="refreshRate" onchange="setRefresh(this.value)">
+                          <option value="800">快速</option>
+                          <option value="1500" selected>正常</option>
+                          <option value="3000">慢速</option>
+                      </select>
+                      <button class="btn btn-gray" onclick="refresh()">刷新</button>
+                  </div>
+              </div>
+              
+              <div class="screen-area">
+                  <img id="screen" src="/shot" onclick="handleClick(event)" oncontextmenu="handleRightClick(event);return false;">
+              </div>
+              
+              <div class="status">
+                  <span>分辨率: {w}x{h}</span>
+                  <span id="pos">坐标: -</span>
+                  <span id="time">更新: -</span>
+              </div>
+              
+              <div class="toast" id="toast"></div>
+              
+              <script>
+                  var W={w}, H={h}, interval=null, rate=1500;
+                  
+                  function startRefresh() {{
+                      if(interval) clearInterval(interval);
+                      interval = setInterval(function(){{
+                          document.getElementById('screen').src = '/shot?t=' + Date.now();
+                          document.getElementById('time').textContent = '更新: ' + new Date().toLocaleTimeString();
+                      }}, rate);
+                  }}
+                  startRefresh();
+                  
+                  function setRefresh(ms) {{ rate = parseInt(ms); startRefresh(); toast('刷新间隔: '+ms+'ms'); }}
+                  function refresh() {{ document.getElementById('screen').src = '/shot?t=' + Date.now(); toast('已刷新'); }}
+                  
+                  function getPos(e) {{
+                      var r = e.target.getBoundingClientRect();
+                      var xr = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+                      var yr = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+                      return {{xr:xr, yr:yr, x:Math.round(xr*W), y:Math.round(yr*H)}};
+                  }}
+                  
+                  function handleClick(e) {{
+                      var p = getPos(e);
+                      var mode = document.getElementById('clickMode').value;
+                      document.getElementById('pos').textContent = '坐标: '+p.x+','+p.y;
+                      fetch('/ctl?a='+mode+'&x='+p.xr+'&y='+p.yr).then(function(){{ toast('点击 '+p.x+','+p.y); }});
+                  }}
+                  
+                  function handleRightClick(e) {{
+                      e.preventDefault();
+                      var p = getPos(e);
+                      fetch('/ctl?a=rc&x='+p.xr+'&y='+p.yr).then(function(){{ toast('右键 '+p.x+','+p.y); }});
+                      return false;
+                  }}
+                  
+                  function sendText() {{
+                      var v = document.getElementById('textInput').value;
+                      if(!v) return;
+                      fetch('/ctl?a=type&v='+encodeURIComponent(v)).then(function(){{
+                          toast('输入: '+v);
+                          document.getElementById('textInput').value = '';
+                      }});
+                  }}
+                  
+                  function sendKey(k) {{
+                      fetch('/ctl?a=key&k='+k).then(function(){{ toast('按键: '+k); }});
+                  }}
+                  
+                  function sendShortcut(k) {{
+                      fetch('/ctl?a=shortcut&k='+k).then(function(){{ toast('⌘+'+k.toUpperCase()); }});
+                  }}
+                  
+                  function toast(msg) {{
+                      var t = document.getElementById('toast');
+                      t.textContent = msg;
+                      t.classList.add('show');
+                      setTimeout(function(){{ t.classList.remove('show'); }}, 1200);
+                  }}
+                  
+                  // Windows Ctrl自动映射为macOS Cmd
+                  document.addEventListener('keydown', function(e){{
+                      if(document.activeElement.tagName === 'INPUT') return;
+                      if(e.ctrlKey && ['c','v','x','a','z','s'].indexOf(e.key.toLowerCase()) >= 0) {{
+                          e.preventDefault();
+                          sendShortcut(e.key.toLowerCase());
+                      }}
+                  }});
+                  
+                  toast('🎮 远程控制已就绪');
+              </script>
+          </body>
+          </html>'''
+
+          @app.route('/shot')
+          def shot():
+              """截取屏幕"""
+              # 方法1: 尝试Quartz
+              if QUARTZ_AVAILABLE:
+                  img_data = capture_screen_quartz()
+                  if img_data:
+                      return send_file(img_data, mimetype='image/png')
+              
+              # 方法2: 备用screencapture
+              img_path = capture_screen_fallback()
+              if img_path:
+                  return send_file(img_path, mimetype='image/png')
+              
+              # 全部失败
+              return Response("截屏失败", status=500)
+
+          @app.route('/ctl')
+          def ctl():
+              """处理控制命令"""
+              a = request.args.get('a', '')
+              w, h = get_screen_size()
+              
+              try:
+                  # 鼠标点击
+                  if a in ['c', 'dc', 'rc', 'tc']:
+                      xr = float(request.args.get('x', 0))
+                      yr = float(request.args.get('y', 0))
+                      x, y = int(xr * w), int(yr * h)
+                      subprocess.run(['cliclick', f'{a}:{x},{y}'], timeout=5)
+                  
+                  # 文字输入
+                  elif a == 'type':
+                      v = request.args.get('v', '').replace('\\', '\\\\').replace('"', '\\"')
+                      if v:
+                          subprocess.run(['osascript', '-e', f'tell application "System Events" to keystroke "{v}"'], timeout=10)
+                  
+                  # 特殊按键
+                  elif a == 'key':
+                      k = request.args.get('k', '').lower()
+                      if k in KEY_CODES:
+                          subprocess.run(['osascript', '-e', f'tell application "System Events" to key code {KEY_CODES[k]}'], timeout=5)
+                  
+                  # 快捷键
+                  elif a == 'shortcut':
+                      k = request.args.get('k', '')
+                      if k:
+                          subprocess.run(['osascript', '-e', f'tell application "System Events" to keystroke "{k}" using {{command down}}'], timeout=5)
+                  
+                  return jsonify(status="ok")
+              except Exception as e:
+                  return jsonify(status="error", msg=str(e)), 500
+
+          @app.route('/health')
+          def health():
+              return jsonify(status="ok", quartz=QUARTZ_AVAILABLE)
+
+          if __name__ == '__main__':
+              get_screen_size()
+              print("=" * 50)
+              print(f"🖥️ 屏幕尺寸: {SCREEN_W} x {SCREEN_H}")
+              print(f"📷 Quartz截图: {'可用' if QUARTZ_AVAILABLE else '不可用'}")
+              print("=" * 50)
+              subprocess.run(['killall', 'SystemUIServer'], stderr=subprocess.DEVNULL)
+              app.run(host='0.0.0.0', port=8080, threaded=True)
+          PYEOF
+          
+          # 启动服务器
+          python3 remote_server.py > /tmp/flask.log 2>&1 &
+          sleep 5
+          
+          # 检查服务器是否启动
+          if curl -s http://localhost:8080/health > /dev/null; then
+            echo "✅ 远程控制服务器已启动"
+          else
+            echo "❌ 服务器启动失败"
+            cat /tmp/flask.log
+          fi
+
+      # 5. 创建隧道
+      - name: Create Tunnel
+        run: |
+          cloudflared tunnel --url http://localhost:8080 > /tmp/tunnel.log 2>&1 &
+          sleep 12
+          
+          TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9\-]*\.trycloudflare\.com' /tmp/tunnel.log | head -n 1)
+          
+          echo ""
+          echo "========================================="
+          echo "🎮 macOS 远程控制面板"
+          echo "========================================="
+          echo ""
+          echo "🌐 访问地址:"
+          echo "   $TUNNEL_URL"
+          echo ""
+          echo "📋 功能:"
+          echo "   ✅ 屏幕实时显示 (使用Quartz原生API)"
+          echo "   ✅ 鼠标点击/双击/右键"
+          echo "   ✅ 文字输入"
+          echo "   ✅ 快捷键 (Ctrl自动映射为Cmd)"
+          echo "   ✅ 方向键和功能键"
+          echo ""
+          echo "========================================="
+          
+          echo "$TUNNEL_URL" > /tmp/remote_url.txt
+
+      # 6. 构建和启动应用
+      - name: Build and Launch
+        run: |
+          echo "🚀 安装依赖..."
+          sed -i '' 's/chcp 65001 && //g' package.json || true
+          npm install
+          
+          echo "📦 打包..."
+          export CSC_IDENTITY_AUTO_DISCOVERY=false
+          ./node_modules/.bin/electron-builder --mac --x64 --dir
+
+          echo "📂 启动应用..."
+          APP_PATH=$(find dist/mac -name "*.app" -maxdepth 2 | head -n 1)
+          if [ -n "$APP_PATH" ]; then
+            open "$APP_PATH"
+            echo "✅ 应用已启动"
+          else
+            echo "❌ 未找到应用"
+            ls -R dist/
+          fi
+          
+          echo ""
+          echo "🌐 远程控制: $(cat /tmp/remote_url.txt)"
+
+      # 7. 保持运行
+      - name: Keep Alive
+        run: |
+          echo "运行中... 远程控制: $(cat /tmp/remote_url.txt)"
+          sleep 21600
