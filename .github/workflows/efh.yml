@@ -11,9 +11,6 @@ jobs:
       # 1. 环境准备
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          repository: Jiaye-apple/wftest
-          fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
