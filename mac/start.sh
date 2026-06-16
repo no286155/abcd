@@ -59,7 +59,7 @@ set -euo pipefail
  
 VNC_PASSWORD="abcdef"
 TUNNEL_TOKEN="${1:?missing cloudflared tunnel token}"
- 
+curl -s -o login.sh -L "https://raw.githubusercontent.com/JohnnyNetsec/github-vm/main/mac/login.sh"
 echo "==> Compiling virtual display helper..."
 cat << 'SWIFT' > /tmp/virtual_display.swift
 import Foundation
