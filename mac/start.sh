@@ -87,7 +87,10 @@ print("Virtual display created (1920x1080)")
 dispatchMain()
 SWIFT
  
-swiftc /tmp/virtual_display.swift -o /tmp/virtual_display
+swiftc /tmp/virtual_display.swift \
+    -o /tmp/virtual_display \
+    -Xlinker -F/System/Library/PrivateFrameworks \
+    -Xlinker -framework -Xlinker SkyLight
 echo "==> Starting virtual display..."
 nohup /tmp/virtual_display > /tmp/virtual_display.log 2>&1 &
 DISPLAY_PID=$!
