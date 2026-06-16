@@ -121,3 +121,10 @@ brew install cloudflared 2>/dev/null || true
 nohup cloudflared tunnel --no-autoupdate run --token "${TUNNEL_TOKEN}" > /tmp/cloudflared.log 2>&1 &
  
 echo "==> Done. Connect via VNC with password: ${VNC_PASSWORD}"
+
+#install ngrok
+brew install ngrok
+
+#configure ngrok and start it
+ngrok authtoken $2
+ngrok tcp 5900 &
