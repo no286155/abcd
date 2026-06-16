@@ -63,27 +63,36 @@ TUNNEL_TOKEN="${1:?missing cloudflared tunnel token}"
 echo "==> Compiling virtual display helper..."
 cat << 'SWIFT' > /tmp/virtual_display.swift
 import Foundation
-import CoreGraphics
- 
-typealias CGVirtualDisplayRef = OpaquePointer
- 
-@_silgen_name("CGVirtualDisplayCreate")
-func CGVirtualDisplayCreate(
-    _ width: UInt32, _ height: UInt32, _ ppi: UInt32,
-    _ name: CFString?, _ serialNumber: UInt32,
-    _ productID: UInt32, _ vendorID: UInt32
-) -> CGVirtualDisplayRef?
- 
+
+// Load SkyLight dynamically
+let skylight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW)
+guard skylight != nil else {
+    fputs("ERROR: couldn't load SkyLight: \(String(cString: dlerror()))\n", stderr)
+    exit(1)
+}
+
+// Look up symbol
+guard let sym = dlsym(skylight, "CGVirtualDisplayCreate") else {
+    fputs("ERROR: CGVirtualDisplayCreate not found in SkyLight\n", stderr)
+    exit(1)
+}
+
+typealias CGVirtualDisplayCreateFn = @convention(c) (
+    UInt32, UInt32, UInt32, CFString?, UInt32, UInt32, UInt32
+) -> OpaquePointer?
+
+let CGVirtualDisplayCreate = unsafeBitCast(sym, to: CGVirtualDisplayCreateFn.self)
+
 guard let display = CGVirtualDisplayCreate(
     1920, 1080, 96,
     "CI-VirtualDisplay" as CFString,
     0x0001, 0x1234, 0x5678
 ) else {
-    fputs("ERROR: CGVirtualDisplayCreate failed\n", stderr)
+    fputs("ERROR: CGVirtualDisplayCreate returned nil\n", stderr)
     exit(1)
 }
- 
-print("Virtual display created (1920x1080)")
+
+print("Virtual display created (1920x1080), PID: \(ProcessInfo.processInfo.processIdentifier)")
 dispatchMain()
 SWIFT
  
