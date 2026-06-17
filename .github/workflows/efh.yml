@@ -385,7 +385,9 @@ jobs:
                       k = request.args.get('k', '').lower()
                       if k in KEY_CODES:
                           subprocess.run(['osascript', '-e', f'tell application "System Events" to key code {KEY_CODES[k]}'], timeout=5)
-                  
+                      elif len(k) == 1:  # printable character
+                          k_escaped = k.replace('\\', '\\\\').replace('"', '\\"')
+                          subprocess.run(['osascript', '-e', f'tell application "System Events" to keystroke "{k_escaped}"'], timeout=5)
                   # 快捷键
                   elif a == 'shortcut':
                       k = request.args.get('k', '')
