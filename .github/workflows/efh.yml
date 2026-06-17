@@ -333,11 +333,14 @@ jobs:
                   
                   // Windows Ctrl自动映射为macOS Cmd
                   document.addEventListener('keydown', function(e){{
+                      # if(document.activeElement.tagName === 'INPUT') return;
+                      # if(e.ctrlKey && ['c','v','x','a','z','s'].indexOf(e.key.toLowerCase()) >= 0) {{
+                      #     e.preventDefault();
+                      #     sendShortcut(e.key.toLowerCase());
+                      # }}
                       if(document.activeElement.tagName === 'INPUT') return;
-                      if(e.ctrlKey && ['c','v','x','a','z','s'].indexOf(e.key.toLowerCase()) >= 0) {{
-                          e.preventDefault();
-                          sendShortcut(e.key.toLowerCase());
-                      }}
+                      e.preventDefault();
+                      fetch('/ctl?a=key&k=' + encodeURIComponent(e.key.toLowerCase()));
                   }});
                   
                   toast('🎮 远程控制已就绪');
